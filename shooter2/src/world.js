@@ -56,7 +56,7 @@ export class World {
     const floorTex = makeNoiseTexture('#23262c', 0.14, 256, true);
     floorTex.repeat.set(40, 40);
     this.mat = {
-      floor: new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.92, metalness: 0.05, color: 0x2a2e35 }),
+      floor: new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.92, metalness: 0.05, color: 0x444c5a }),
       wall: new THREE.MeshStandardMaterial({ map: makeNoiseTexture('#41464e', 0.1), roughness: 0.85, metalness: 0.1, color: 0x4a4f57 }),
       metal: new THREE.MeshStandardMaterial({ map: makeNoiseTexture('#5a5f66', 0.08), roughness: 0.5, metalness: 0.7, color: 0x6a7078 }),
       darkMetal: new THREE.MeshStandardMaterial({ color: 0x33373d, roughness: 0.6, metalness: 0.6 }),
@@ -101,15 +101,17 @@ export class World {
     this.scene.add(stars);
 
     // Fog for depth/atmosphere
-    this.scene.fog = new THREE.FogExp2(0x0c1018, 0.012);
+    this.scene.fog = new THREE.FogExp2(0x121826, 0.0085);
   }
 
   _buildLighting() {
-    const hemi = new THREE.HemisphereLight(0x5a6e85, 0x14171c, 0.55);
+    const hemi = new THREE.HemisphereLight(0x8aa2bd, 0x222833, 1.6);
     this.scene.add(hemi);
+    // Soft ambient so deep shadows still read on a night map.
+    this.scene.add(new THREE.AmbientLight(0x4a5a70, 0.6));
 
     // Moonlight key (directional, shadow-casting).
-    const moon = new THREE.DirectionalLight(0x9fb8d8, 0.6);
+    const moon = new THREE.DirectionalLight(0xb8d2ee, 1.8);
     moon.position.set(40, 60, 20);
     moon.castShadow = true;
     moon.shadow.mapSize.set(2048, 2048);
@@ -141,7 +143,7 @@ export class World {
     return m;
   }
 
-  _lamp(x, z, color = 0xffd9a0, intensity = 2.2, height = 7) {
+  _lamp(x, z, color = 0xffd9a0, intensity = 3.2, height = 7) {
     // Pole
     this._box(0.18, height, 0.18, x, height / 2, z, this.mat.pipe, { cast: false });
     this._box(0.8, 0.12, 0.4, x, height, z + 0.2, this.mat.darkMetal, { cast: false, collide: false });
@@ -149,7 +151,7 @@ export class World {
       new THREE.MeshStandardMaterial({ color: 0x111, emissive: color, emissiveIntensity: 2 }));
     lampMesh.position.set(x, height - 0.05, z + 0.35);
     this.group.add(lampMesh);
-    const light = new THREE.PointLight(color, intensity, 22, 1.8);
+    const light = new THREE.PointLight(color, intensity, 30, 1.7);
     light.position.set(x, height - 0.3, z + 0.35);
     this.scene.add(light);
     this.lights.push(light);

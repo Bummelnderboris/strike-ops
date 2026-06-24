@@ -24,6 +24,7 @@
               <li><b>SPACE</b> — shoot</li>
               <li><b>R</b> — reload</li>
               <li><b>L-SHIFT</b> — dash</li>
+              <li><b>Q</b> — grenade</li>
             </ul>
           </div>
           <div class="ctrl p2">
@@ -33,11 +34,24 @@
               <li><b>.</b> (period) — shoot</li>
               <li><b>,</b> (comma) — reload</li>
               <li><b>/</b> (slash) — dash</li>
+              <li><b>R-SHIFT</b> — grenade</li>
             </ul>
           </div>
         </div>
 
         <div class="setup">
+          <label>Mode:
+            <select id="mode">
+              <option value="dm" selected>Deathmatch</option>
+              <option value="gg">Gun Game</option>
+            </select>
+          </label>
+          <label>Player 2:
+            <select id="opponent">
+              <option value="human" selected>Human</option>
+              <option value="cpu">CPU bot</option>
+            </select>
+          </label>
           <label>Kills to win:
             <select id="killTarget">
               <option>10</option>
@@ -49,7 +63,7 @@
         </div>
 
         <button id="startBtn">START MATCH</button>
-        <p class="hint">Pick up weapon crates &amp; med-kits on the map. Use cover. First to the target wins.</p>
+        <p class="hint">Grab weapons, med-kits, armor &amp; power-ups. Cook grenades, blow the barrels, use cover.<br>Deathmatch: first to the kill target. Gun Game: kill your way through every weapon.</p>
       </div>
     </div>
 

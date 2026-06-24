@@ -14,7 +14,7 @@ export class Engine {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = 1.25;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(this.renderer.domElement);
 
@@ -33,11 +33,14 @@ export class Engine {
     this.viewCamera = new THREE.PerspectiveCamera(
       60, window.innerWidth / window.innerHeight, 0.01, 10
     );
-    this.viewLight = new THREE.HemisphereLight(0xbfd2e6, 0x202028, 1.1);
+    this.viewLight = new THREE.HemisphereLight(0xcfe0f0, 0x303038, 1.5);
     this.viewScene.add(this.viewLight);
-    const vKey = new THREE.DirectionalLight(0xffffff, 1.6);
+    const vKey = new THREE.DirectionalLight(0xffffff, 2.2);
     vKey.position.set(0.5, 1.2, 1);
     this.viewScene.add(vKey);
+    const vFill = new THREE.DirectionalLight(0x8fb0d8, 0.8);
+    vFill.position.set(-0.8, 0.2, 0.6);
+    this.viewScene.add(vFill);
 
     this.baseFov = 80;
     window.addEventListener('resize', () => this.onResize());

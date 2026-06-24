@@ -53,6 +53,7 @@ export class Player {
     this.dead = false;
     this.maxStamina = 100;
     this.stamina = 100;
+    this.speedMul = 1;          // raised by mobility upgrades
 
     this.lastStepDist = 0;
     this.time = 0;
@@ -173,6 +174,7 @@ export class Player {
     let target = 5.4;
     if (this.crouching) target = 2.6;
     if (this.sprinting) target = 8.4;
+    target *= this.speedMul;
     if (this.adsBlend > 0.5 && !this.sprinting) target *= 0.7;
     const accel = this.onGround ? (this.sliding ? 2 : 52) : 9;
     const friction = this.onGround ? (this.sliding ? 2.2 : 11) : 0.2;

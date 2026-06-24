@@ -12,6 +12,7 @@
     "three": "^0.169.0"
   },
   "devDependencies": {
+    "puppeteer-core": "^25.2.1",
     "vite": "^5.4.10"
   }
 }
