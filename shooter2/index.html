@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>BREACHPOINT</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <style>
+      :root {
+        --hud: #d8e0e6;
+        --accent: #ff4b3e;
+        --accent2: #4bd2ff;
+        --good: #6cf06c;
+        --warn: #ffcf4b;
+        --bg0: #05070a;
+        --mono: "DM Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { height: 100%; background: var(--bg0); overflow: hidden; }
+      body {
+        font-family: var(--mono);
+        color: var(--hud);
+        cursor: default;
+        -webkit-user-select: none; user-select: none;
+        letter-spacing: 0.02em;
+      }
+      #app { position: fixed; inset: 0; }
+      canvas { display: block; width: 100%; height: 100%; }
+      .hidden { display: none !important; }
+      .fade { transition: opacity 0.35s ease; }
+      #ui-root { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+      #ui-root .panel { pointer-events: auto; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="ui-root"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

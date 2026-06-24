@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>STRIKE OPS — 2P Local Deathmatch</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="game" width="1280" height="720"></canvas>
+
+    <!-- Start / Menu overlay -->
+    <div id="menu" class="overlay">
+      <div class="panel">
+        <h1>STRIKE&nbsp;OPS</h1>
+        <p class="tag">Two-player local deathmatch · one keyboard</p>
+
+        <div class="controls">
+          <div class="ctrl p1">
+            <h3>Player 1 <span class="dot d1"></span></h3>
+            <ul>
+              <li><b>W A S D</b> — move</li>
+              <li><b>SPACE</b> — shoot</li>
+              <li><b>R</b> — reload</li>
+              <li><b>L-SHIFT</b> — dash</li>
+            </ul>
+          </div>
+          <div class="ctrl p2">
+            <h3>Player 2 <span class="dot d2"></span></h3>
+            <ul>
+              <li><b>&#9650; &#9664; &#9660; &#9658;</b> — move</li>
+              <li><b>.</b> (period) — shoot</li>
+              <li><b>,</b> (comma) — reload</li>
+              <li><b>/</b> (slash) — dash</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="setup">
+          <label>Kills to win:
+            <select id="killTarget">
+              <option>10</option>
+              <option selected>15</option>
+              <option>20</option>
+              <option>30</option>
+            </select>
+          </label>
+        </div>
+
+        <button id="startBtn">START MATCH</button>
+        <p class="hint">Pick up weapon crates &amp; med-kits on the map. Use cover. First to the target wins.</p>
+      </div>
+    </div>
+
+    <!-- Win overlay -->
+    <div id="win" class="overlay hidden">
+      <div class="panel">
+        <h1 id="winTitle">PLAYER 1 WINS</h1>
+        <p id="winStats" class="tag"></p>
+        <button id="rematchBtn">REMATCH</button>
+        <button id="menuBtn" class="ghost">MAIN MENU</button>
+      </div>
+    </div>
+
+    <div id="pauseHint">P — pause</div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
