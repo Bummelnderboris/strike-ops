@@ -86,33 +86,66 @@ const GG_TIERS     = ["pistol","smg","shotgun","rifle","sniper","minigun"]; // g
    Map
 ---------------------------------------------------------------------------- */
 const WALL_T = 22;
-const walls = [
-  {x:0,y:0,w:W,h:WALL_T}, {x:0,y:H-WALL_T,w:W,h:WALL_T},
-  {x:0,y:0,w:WALL_T,h:H}, {x:W-WALL_T,y:0,w:WALL_T,h:H},
-  {x:560,y:300,w:160,h:120},                 // central bunker
-  {x:340,y:170,w:90,h:40}, {x:850,y:170,w:90,h:40},
-  {x:340,y:510,w:90,h:40}, {x:850,y:510,w:90,h:40},
-  {x:170,y:300,w:40,h:120}, {x:1070,y:300,w:40,h:120},
-  {x:560,y:90,w:160,h:40},  {x:560,y:590,w:160,h:40},
-];
 
-// destructible crates (cover that breaks)
-const CRATE_DEFS = [
-  {x:470,y:240,w:46,h:46}, {x:764,y:240,w:46,h:46},
-  {x:470,y:434,w:46,h:46}, {x:764,y:434,w:46,h:46},
-];
-// explosive barrels (chain-reacting hazards)
-const BARREL_DEFS = [ {x:300,y:360}, {x:980,y:360}, {x:640,y:250}, {x:640,y:470} ];
+/* Each map: inner walls [x,y,w,h], crates [x,y], barrels [x,y],
+   spawns [x,y] ([0]&[1] are the two starting corners), pads [type,x,y]. */
+const MAPS = {
+  bunker: {
+    name:"Bunker",
+    walls:[[560,300,160,120],[340,170,90,40],[850,170,90,40],[340,510,90,40],[850,510,90,40],
+           [170,300,40,120],[1070,300,40,120],[560,90,160,40],[560,590,160,40]],
+    crates:[[470,240],[764,240],[470,434],[764,434]],
+    barrels:[[300,360],[980,360],[640,250],[640,470]],
+    spawns:[[90,90],[1190,630],[1190,90],[90,630],[640,90],[640,630]],
+    pads:[["weapon",640,210],["weapon",640,510],["med",250,360],["med",1030,360],["power",280,120],["power",1000,600]],
+  },
+  crossfire: {
+    name:"Crossfire",
+    walls:[[620,200,40,320],[460,340,360,40],
+           [150,150,90,40],[1040,150,90,40],[150,530,90,40],[1040,530,90,40],
+           [400,90,40,110],[840,90,40,110],[400,520,40,110],[840,520,40,110]],
+    crates:[[300,300],[934,300],[300,400],[934,400]],
+    barrels:[[640,150],[640,565],[430,360],[850,360]],
+    spawns:[[90,360],[1190,360],[90,90],[1190,630],[640,80],[640,640]],
+    pads:[["weapon",250,200],["weapon",1030,520],["med",1030,200],["med",250,520],["power",640,140],["power",640,575]],
+  },
+  quarters: {
+    name:"Quarters",
+    walls:[[300,200,80,80],[900,200,80,80],[300,440,80,80],[900,440,80,80],
+           [600,160,80,30],[600,530,80,30],[160,330,30,120],[1090,330,30,120],[600,330,80,60]],
+    crates:[[460,300],[774,300],[460,374],[774,374]],
+    barrels:[[330,360],[950,360],[640,150],[640,560]],
+    spawns:[[90,90],[1190,630],[1190,90],[90,630],[90,360],[1190,360]],
+    pads:[["weapon",640,90],["weapon",640,630],["med",230,360],["med",1050,360],["power",330,180],["power",950,540]],
+  },
+};
+const MAP_IDS = ["bunker","crossfire","quarters"];
 
-const SPAWNS = [
-  {x:90,y:90},{x:90,y:H-90},{x:W-90,y:90},{x:W-90,y:H-90},{x:W/2,y:90},{x:W/2,y:H-90},
-];
-const PICKUP_PADS = [
-  {x:W/2,y:H/2-150,type:"weapon"}, {x:W/2,y:H/2+150,type:"weapon"},
-  {x:250,y:H/2,type:"med"},        {x:W-250,y:H/2,type:"med"},
-  {x:W/2-360,y:120,type:"power"},  {x:W/2+360,y:H-120,type:"power"},
-];
+function buildMap(id){
+  const m = MAPS[id] || MAPS.bunker;
+  const walls = [
+    {x:0,y:0,w:W,h:WALL_T},{x:0,y:H-WALL_T,w:W,h:WALL_T},
+    {x:0,y:0,w:WALL_T,h:H},{x:W-WALL_T,y:0,w:WALL_T,h:H},
+  ];
+  for(const w of m.walls) walls.push({x:w[0],y:w[1],w:w[2],h:w[3]});
+  return {
+    name:m.name,
+    walls,
+    spawns: m.spawns.map(s=>({x:s[0],y:s[1]})),
+    crates: m.crates.map(c=>({x:c[0],y:c[1],w:46,h:46,hp:70,alive:true})),
+    barrels: m.barrels.map(b=>({x:b[0],y:b[1],r:16,hp:30,alive:true})),
+    pads: m.pads.map(p=>({type:p[0],x:p[1],y:p[2]})),
+  };
+}
+
 const POWER_CYCLE = ["armor","damage","speed"];
+
+/* Bot difficulty tuning */
+const DIFF = {
+  easy:   { err:0.34, align:0.40, dashCd:2.6, nadeMin:6, nadeMax:10, miss:0.30 },
+  normal: { err:0.16, align:0.22, dashCd:1.6, nadeMin:4, nadeMax:7,  miss:0.08 },
+  insane: { err:0.05, align:0.13, dashCd:1.0, nadeMin:3, nadeMax:5,  miss:0.0  },
+};
 
 /* circle vs rect push-out */
 function resolveCircleRect(cx,cy,r,rect){
@@ -131,7 +164,7 @@ function resolveCircleRect(cx,cy,r,rect){
   return {x:(dx/d)*overlap, y:(dy/d)*overlap};
 }
 function pointInRect(x,y,r){ return x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h; }
-function pointInAnyWall(x,y){ for(const w of walls) if(pointInRect(x,y,w)) return true; return false; }
+function pointInAnyWall(x,y){ for(const w of Game.walls) if(pointInRect(x,y,w)) return true; return false; }
 function pointBlocked(x,y){
   if(pointInAnyWall(x,y)) return true;
   for(const c of Game.crates) if(c.alive && pointInRect(x,y,c)) return true;
@@ -152,7 +185,7 @@ function losClear(x1,y1,x2,y2){
 ---------------------------------------------------------------------------- */
 class Player {
   constructor(id,color,controls,spawn,facing,bot){
-    this.id=id; this.color=color; this.controls=controls; this.r=16;
+    this.id=id; this.slot=id-1; this.color=color; this.controls=controls; this.r=16;
     this.maxHp=100; this.kills=0; this.deaths=0; this.tier=0;
     this.faceDefault=facing; this.bot=!!bot;
     // AI persistent state
@@ -214,12 +247,13 @@ class Pickup {
    Game state
 ---------------------------------------------------------------------------- */
 const Game = {
-  state:"menu", mode:"dm", vsCpu:false,
+  state:"menu", mode:"dm", vsCpu:false, botDiff:"normal",
+  mapChoice:"bunker", mapName:"Bunker",
   players:[], bullets:[], particles:[], pickups:[], grenades:[],
-  crates:[], barrels:[],
+  crates:[], barrels:[], walls:[], spawns:[],
   shake:0, killTarget:15, winner:null,
   hitMarks:[], killFeed:[], announce:null, firstBlood:false,
-  time:0, flash:0,
+  time:0, flash:0, freeze:0, fought:false,
 };
 
 const keys = Object.create(null);
@@ -229,20 +263,24 @@ const CONTROLS = {
 };
 
 function newMatch(){
+  let id=Game.mapChoice;
+  if(id==="random") id=MAP_IDS[Math.floor(Math.random()*MAP_IDS.length)];
+  const m=buildMap(id);
+  Game.walls=m.walls; Game.spawns=m.spawns; Game.mapName=m.name;
+  Game.crates=m.crates; Game.barrels=m.barrels;
+  Game.pickups=m.pads.map(p=>new Pickup(p));
   Game.players=[
-    new Player(1, getCss("--d1")||"#4ea8ff", CONTROLS.p1, SPAWNS[0], 0, false),
-    new Player(2, getCss("--d2")||"#ff5d5d", CONTROLS.p2, SPAWNS[3], Math.PI, Game.vsCpu),
+    new Player(1, getCss("--d1")||"#4ea8ff", CONTROLS.p1, m.spawns[0], 0, false),
+    new Player(2, getCss("--d2")||"#ff5d5d", CONTROLS.p2, m.spawns[1], Math.PI, Game.vsCpu),
   ];
   Game.bullets=[]; Game.particles=[]; Game.grenades=[];
-  Game.pickups=PICKUP_PADS.map(p=>new Pickup(p));
-  Game.crates=CRATE_DEFS.map(c=>({x:c.x,y:c.y,w:c.w,h:c.h,hp:70,alive:true}));
-  Game.barrels=BARREL_DEFS.map(b=>({x:b.x,y:b.y,r:16,hp:30,alive:true}));
   Game.shake=0; Game.winner=null; Game.hitMarks=[]; Game.killFeed=[];
   Game.announce=null; Game.firstBlood=false; Game.time=0; Game.flash=0;
+  Game.freeze=3.2; Game.fought=false;
 }
 function farthestSpawn(){
-  let best=SPAWNS[0], bestScore=-1;
-  for(const s of SPAWNS){
+  let best=Game.spawns[0], bestScore=-1;
+  for(const s of Game.spawns){
     let score=Infinity;
     for(const p of Game.players){ if(p.dead) continue; score=Math.min(score,dist2(s.x,s.y,p.x,p.y)); }
     if(score===Infinity) score=0;
@@ -256,6 +294,10 @@ function farthestSpawn(){
 ---------------------------------------------------------------------------- */
 function update(dt){
   Game.time += dt;
+  if(Game.freeze>0){
+    Game.freeze-=dt;
+    if(Game.freeze<=0 && !Game.fought){ Game.fought=true; Game.announce={txt:"FIGHT!",col:"#ffffff",life:1.0}; Sound.announce(); }
+  }
   for(const p of Game.players) updatePlayer(p,dt);
   updateBullets(dt);
   updateGrenades(dt);
@@ -284,15 +326,14 @@ function updatePlayer(p,dt){
 
   // ---- gather intent ----
   let mx=0,my=0,wantShoot=false,wantReload=false,wantDash=false,wantNade=false;
-  if(p.bot){
+  if(Game.freeze>0){
+    // pre-match countdown: stand ready, no actions
+  } else if(p.bot){
     const it=aiThink(p,dt);
     mx=it.mx; my=it.my; wantShoot=it.shoot; wantReload=it.reload; wantDash=it.dash; wantNade=it.nade;
   } else {
-    const c=p.controls;
-    mx=(keys[c.right]?1:0)-(keys[c.left]?1:0);
-    my=(keys[c.down]?1:0)-(keys[c.up]?1:0);
-    wantShoot=!!keys[c.shoot]; wantReload=!!keys[c.reload]; wantDash=!!keys[c.dash]; wantNade=!!keys[c.nade];
-    if(mx||my){ const l=Math.hypot(mx,my); p.face=Math.atan2(my/l,mx/l); }
+    const it=getHumanIntent(p);   // gamepad if present, else keyboard (sets p.face)
+    mx=it.mx; my=it.my; wantShoot=it.shoot; wantReload=it.reload; wantDash=it.dash; wantNade=it.nade;
   }
   let nx=mx,ny=my; const moving=!!(nx||ny);
   if(moving){ const l=Math.hypot(nx,ny)||1; nx/=l; ny/=l; }
@@ -319,7 +360,7 @@ function updatePlayer(p,dt){
   // ---- move + collide ----
   p.prevx=p.x; p.prevy=p.y;
   if(moving){ p.x+=nx*speed*dt; p.y+=ny*speed*dt; }
-  for(const w of walls){ const push=resolveCircleRect(p.x,p.y,p.r,w); if(push){ p.x+=push.x; p.y+=push.y; } }
+  for(const w of Game.walls){ const push=resolveCircleRect(p.x,p.y,p.r,w); if(push){ p.x+=push.x; p.y+=push.y; } }
   for(const c of Game.crates){ if(!c.alive) continue; const push=resolveCircleRect(p.x,p.y,p.r,c); if(push){ p.x+=push.x; p.y+=push.y; } }
   for(const b of Game.barrels){ if(!b.alive) continue; const d=dist(p.x,p.y,b.x,b.y),min=p.r+b.r; if(d<min&&d>0){ p.x+=(p.x-b.x)/d*(min-d); p.y+=(p.y-b.y)/d*(min-d); } }
   for(const o of Game.players){ if(o===p||o.dead) continue; const d=dist(p.x,p.y,o.x,o.y),min=p.r+o.r; if(d<min&&d>0){ const push=(min-d)/2,ux=(p.x-o.x)/d,uy=(p.y-o.y)/d; p.x+=ux*push; p.y+=uy*push; o.x-=ux*push; o.y-=uy*push; } }
@@ -540,13 +581,52 @@ function updateFloaters(dt){
 }
 
 /* ----------------------------------------------------------------------------
+   Human input — gamepad (twin-stick) with keyboard fallback
+---------------------------------------------------------------------------- */
+function padForSlot(slot){
+  const gps = navigator.getGamepads ? navigator.getGamepads() : [];
+  const list=[]; for(const g of gps) if(g && g.connected!==false) list.push(g);
+  return list[slot] || null;
+}
+function readGamepad(gp){
+  const dz=0.25;
+  const lx=gp.axes[0]||0, ly=gp.axes[1]||0, rx=gp.axes[2]||0, ry=gp.axes[3]||0;
+  const lm=Math.hypot(lx,ly), rm=Math.hypot(rx,ry);
+  const btn=i=>!!(gp.buttons[i]&&gp.buttons[i].pressed);
+  const trig=i=>(gp.buttons[i]?gp.buttons[i].value:0)>0.35;
+  let aim=null, shoot=false;
+  if(rm>dz){ aim=Math.atan2(ry,rx); shoot=true; }      // right stick aims + fires
+  if(trig(7)) shoot=true;                               // RT also fires
+  return {
+    mx: lm>dz?lx:0, my: lm>dz?ly:0,
+    shoot, reload: btn(2), dash: btn(0)||trig(6), nade: btn(5)||btn(4),
+    aim,
+  };
+}
+function getHumanIntent(p){
+  const gp=padForSlot(p.slot);
+  if(gp){
+    const it=readGamepad(gp);
+    if(it.aim!=null) p.face=it.aim;
+    else if(it.mx||it.my) p.face=Math.atan2(it.my,it.mx);
+    return it;
+  }
+  const c=p.controls;
+  const mx=(keys[c.right]?1:0)-(keys[c.left]?1:0);
+  const my=(keys[c.down]?1:0)-(keys[c.up]?1:0);
+  if(mx||my){ const l=Math.hypot(mx,my); p.face=Math.atan2(my/l,mx/l); }
+  return { mx,my, shoot:!!keys[c.shoot], reload:!!keys[c.reload], dash:!!keys[c.dash], nade:!!keys[c.nade], aim:null };
+}
+
+/* ----------------------------------------------------------------------------
    AI bot
 ---------------------------------------------------------------------------- */
 function aiThink(p,dt){
+  const D = DIFF[Game.botDiff] || DIFF.normal;
   const out={mx:0,my:0,shoot:false,reload:false,dash:false,nade:false};
   const t=Game.players.find(o=>o!==p);
-  // slow aim error random-walk → beatable
-  p.aimErr=clamp(p.aimErr+rand(-0.04,0.04),-0.16,0.16);
+  // slow aim error random-walk → beatable, scaled by difficulty
+  p.aimErr=clamp(p.aimErr+rand(-0.04,0.04),-D.err,D.err);
   p.botDashCd=Math.max(0,p.botDashCd-dt);
   p.botNadeCd=Math.max(0,p.botNadeCd-dt);
   p.botStrafeT-=dt; if(p.botStrafeT<=0){ p.botStrafe=Math.random()<0.5?-1:1; p.botStrafeT=rand(0.8,1.8); }
@@ -598,9 +678,10 @@ function aiThink(p,dt){
   out.mx=gx; out.my=gy;
 
   // ---- combat decisions ----
-  const aligned=Math.abs(angDiff(p.face,Math.atan2(t.y-p.y,t.x-p.x)))<0.22;
+  const aligned=Math.abs(angDiff(p.face,Math.atan2(t.y-p.y,t.x-p.x)))<D.align;
   if(p.weapon==="minigun" && los && d<range) out.shoot=true; // pre-spin
   if(los && d<eff && aligned && p.ammo>0) out.shoot=true;
+  if(out.shoot && D.miss>0 && Math.random()<D.miss) out.shoot=false; // trigger discipline on easier bots
   if(p.ammo<=0) out.reload=true;
 
   // dodge: dash if an enemy bullet is bearing down
@@ -609,12 +690,12 @@ function aiThink(p,dt){
       if(b.owner===p) continue;
       if(dist(b.x,b.y,p.x,p.y)<140){
         const bang=Math.atan2(p.y-b.y,p.x-b.x), bvel=Math.atan2(b.vy,b.vx);
-        if(Math.abs(angDiff(bang,bvel))<0.4){ out.dash=true; out.mx=-toT_y*p.botStrafe; out.my=toT_x*p.botStrafe; p.botDashCd=1.6; break; }
+        if(Math.abs(angDiff(bang,bvel))<0.4){ out.dash=true; out.mx=-toT_y*p.botStrafe; out.my=toT_x*p.botStrafe; p.botDashCd=D.dashCd; break; }
       }
     }
   }
   // grenade flush
-  if(p.botNadeCd<=0 && p.nades>0 && los && d>130 && d<330){ out.nade=true; p.botNadeCd=rand(4,7); }
+  if(p.botNadeCd<=0 && p.nades>0 && los && d>130 && d<330){ out.nade=true; p.botNadeCd=rand(D.nadeMin,D.nadeMax); }
   return out;
 }
 
@@ -650,7 +731,7 @@ function drawFloor(){
   ctx.beginPath(); ctx.arc(W/2,H/2,90,0,TAU); ctx.stroke();
 }
 function drawWalls(){
-  for(const w of walls){
+  for(const w of Game.walls){
     const g=ctx.createLinearGradient(w.x,w.y,w.x,w.y+w.h);
     g.addColorStop(0,"#2c3a52"); g.addColorStop(1,"#1d2738");
     ctx.fillStyle=g; roundRect(w.x,w.y,w.w,w.h,4); ctx.fill();
@@ -817,6 +898,20 @@ function drawHUD(){
     ctx.globalAlpha=1;
   }
 
+  // map name (top-right corner, subtle)
+  ctx.textAlign="right"; ctx.textBaseline="top"; ctx.font="11px Segoe UI"; ctx.fillStyle="#54657d";
+  ctx.fillText(Game.mapName.toUpperCase(),W-14,14);
+
+  // pre-match countdown
+  if(Game.freeze>0){
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    const n=Math.ceil(Game.freeze-0.2);
+    const scale=1+( (Game.freeze%1) )*0.4;
+    ctx.font="bold "+Math.round(110*scale)+"px Segoe UI";
+    ctx.fillStyle="rgba(255,255,255,"+clamp((Game.freeze%1)+0.2,0.2,1)+")";
+    if(n>0) ctx.fillText(n,W/2,H/2);
+  }
+
   if(Game.state==="paused"){
     ctx.fillStyle="rgba(6,9,14,0.6)"; ctx.fillRect(0,0,W,H);
     ctx.fillStyle="#fff"; ctx.font="bold 48px Segoe UI"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("PAUSED",W/2,H/2);
@@ -860,6 +955,8 @@ const menuEl=document.getElementById("menu"), winEl=document.getElementById("win
 function startMatch(){
   Game.mode=document.getElementById("mode").value;
   Game.vsCpu=document.getElementById("opponent").value==="cpu";
+  Game.botDiff=document.getElementById("difficulty").value||"normal";
+  Game.mapChoice=document.getElementById("map").value||"bunker";
   Game.killTarget=parseInt(document.getElementById("killTarget").value,10)||15;
   newMatch();
   Game.state="playing"; menuEl.classList.add("hidden"); winEl.classList.add("hidden");

@@ -21,7 +21,17 @@ export const ARCHETYPES = {
   heavy: {
     name: 'HEAVY', health: 320, speed: 2.0, color: 0x3a3a4a, accent: 0x5a6ad8,
     fireRate: 2.2, burst: 8, burstGap: 0.1, damage: 12, range: 45, accuracy: 0.78,
-    coverBias: 0.3, scoreVal: 250, headHeight: 1.78, big: true,
+    coverBias: 0.3, scoreVal: 250, headHeight: 1.78, big: true, grenades: true,
+  },
+  sniper: {
+    name: 'MARKSMAN', health: 65, speed: 2.6, color: 0x2a3340, accent: 0xff3b30,
+    fireRate: 3.4, burst: 1, burstGap: 0, damage: 42, range: 95, accuracy: 0.97,
+    coverBias: 0.7, scoreVal: 180, headHeight: 1.66, sniper: true, chargeTime: 1.3,
+  },
+  titan: {
+    name: 'TITAN', health: 2600, speed: 1.7, color: 0x241f2c, accent: 0xff7a1a,
+    fireRate: 1.4, burst: 12, burstGap: 0.08, damage: 14, range: 55, accuracy: 0.8,
+    coverBias: 0.05, scoreVal: 2500, headHeight: 2.3, big: true, boss: true, grenades: true,
   },
 };
 
@@ -55,6 +65,13 @@ class Enemy {
     this.dead = false;
     this.deathTime = 0;
     this.muzzleCooldown = 0;
+    // Pathfinding state.
+    this.path = null;
+    this.pathIndex = 0;
+    this.pathGoal = null;
+    this.repathTimer = rand(0, 0.5);
+    this.suppressed = 0;
+    this.grenadeCD = rand(3, 8);
     this._build();
   }
 
@@ -64,7 +81,7 @@ class Enemy {
     const bodyMat = new THREE.MeshStandardMaterial({ color: d.color, roughness: 0.7, metalness: 0.2 });
     const accentMat = new THREE.MeshStandardMaterial({ color: d.accent, roughness: 0.6, metalness: 0.3, emissive: d.accent, emissiveIntensity: 0.15 });
     const headMat = new THREE.MeshStandardMaterial({ color: 0x20242a, roughness: 0.5, metalness: 0.4 });
-    const scale = d.big ? 1.25 : 1.0;
+    const scale = d.boss ? 1.9 : (d.big ? 1.25 : 1.0);
 
     // Torso
     const torso = new THREE.Mesh(new THREE.BoxGeometry(0.5 * scale, 0.7 * scale, 0.3 * scale), bodyMat);
@@ -87,11 +104,22 @@ class Enemy {
     const rArm = new THREE.Mesh(armGeo, bodyMat); rArm.position.set(0.34 * scale, 1.1 * scale, 0.1); g.add(rArm);
     this.rArm = rArm; this.lArm = lArm; this.legsMesh = legs; this.torsoMesh = torso;
     // Gun
-    const gun = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.5), new THREE.MeshStandardMaterial({ color: 0x16181b, metalness: 0.6, roughness: 0.4 }));
-    gun.position.set(0.34 * scale, 1.1 * scale, 0.35); g.add(gun);
+    const gunLen = d.sniper ? 0.85 : 0.5;
+    const gun = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, gunLen), new THREE.MeshStandardMaterial({ color: 0x16181b, metalness: 0.6, roughness: 0.4 }));
+    gun.position.set(0.34 * scale, 1.1 * scale, 0.2 + gunLen / 2); g.add(gun);
     this.gunMesh = gun;
     // Muzzle marker
     this.muzzlePos = new THREE.Vector3();
+
+    // Sniper aiming laser (world-space line, shown while charging a shot).
+    if (d.sniper) {
+      const lg = new THREE.BufferGeometry();
+      lg.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(6), 3));
+      this.laser = new THREE.Line(lg, new THREE.LineBasicMaterial({ color: 0xff2a1a, transparent: true, opacity: 0 }));
+      this.laser.frustumCulled = false;
+      this.mgr.scene.add(this.laser);
+      this.charging = 0;
+    }
 
     g.position.copy(this.pos);
     this.group = g;
@@ -131,6 +159,7 @@ class Enemy {
     this.health -= amount;
     this._lastWasHead = zone === 'head';
     this.hitFlash = 1;
+    this.suppressed = Math.min(1, this.suppressed + 0.6);
     this.alertLevel = 1;
     this.lastSeenPos = this.mgr.player.eyePos.clone();
     if (this.state === STATE.IDLE || this.state === STATE.PATROL) this._enterCombat();
@@ -189,10 +218,15 @@ class Enemy {
     this.hitFlash = damp(this.hitFlash, 0, 8, dt);
     this.muzzleCooldown -= dt;
     if (this.reactionTimer > 0) this.reactionTimer -= dt;
+    if (this.suppressed > 0) this.suppressed = Math.max(0, this.suppressed - dt * 0.6);
+    if (this.grenadeCD > 0) this.grenadeCD -= dt;
 
     const toPlayer = new THREE.Vector3().subVectors(player.eyePos, this.eyePos);
     const distToPlayer = toPlayer.length();
     const playerVisible = !player.dead && distToPlayer < 75 && this._canSeePlayer(player, toPlayer, distToPlayer);
+
+    // Sniper laser telegraph.
+    if (this.laser) this._updateLaser(player, playerVisible);
 
     if (playerVisible) {
       this.alertLevel = Math.min(1, this.alertLevel + dt * 3);
@@ -236,7 +270,7 @@ class Enemy {
     if (!this.target || this.pos.distanceTo(new THREE.Vector3(this.target.x, 0, this.target.z)) < 1.5) {
       this.target = this.mgr.randomNavNear(this.pos, 18);
     }
-    this._moveToward(this.target, this.def.speed * 0.5, dt);
+    this._navTo(this.target, this.def.speed * 0.5, dt);
   }
 
   _stateAlert(dt, playerVisible) {
@@ -252,9 +286,17 @@ class Enemy {
 
     // decide whether to seek cover
     if (!playerVisible) {
+      // Flush a camping/hidden player with a grenade at their last known spot.
+      if (this.def.grenades && this.lastSeenPos && this.stateTime < 3 && this.grenadeCD <= 0) {
+        const d = this.pos.distanceTo(this.lastSeenPos);
+        if (d > 8 && d < 30 && Math.random() < 0.6) {
+          this.mgr.throwEnemyGrenade(this.eyePos.clone(), this.lastSeenPos.clone());
+          this.grenadeCD = rand(8, 13);
+        } else this.grenadeCD = rand(2, 4);
+      }
       // pursue last known position
       if (this.lastSeenPos) {
-        this._moveToward({ x: this.lastSeenPos.x, z: this.lastSeenPos.z }, def.speed, dt);
+        this._navTo({ x: this.lastSeenPos.x, z: this.lastSeenPos.z }, def.speed, dt);
         if (this.pos.distanceTo(this.lastSeenPos) < 2 && this.stateTime > 1) {
           this.state = STATE.PATROL; this.alertLevel = 0.4;
         }
@@ -264,7 +306,7 @@ class Enemy {
 
     // Rushers close distance aggressively; others manage range & cover.
     if (this.type === 'rusher') {
-      if (dist > 2.2) this._moveToward({ x: player.pos.x, z: player.pos.z }, def.speed, dt);
+      if (dist > 2.2) this._navTo({ x: player.pos.x, z: player.pos.z }, def.speed, dt);
       else this._meleeOrShoot(dt, player, dist);
       this._shoot(dt, player, dist);
       return;
@@ -285,6 +327,11 @@ class Enemy {
     move.addScaledVector(rightV, this.strafeDir * 0.8);
     this._steer(move, def.speed * 0.85, dt);
 
+    // Lob a grenade to pressure the player at mid range.
+    if (this.def.grenades && dist > 9 && dist < 30 && this.grenadeCD <= 0 && this.stateTime > 1.5) {
+      this._tryGrenade(player, dist);
+    }
+
     // Consider cover when health low or under pressure.
     if (Math.random() < def.coverBias * dt * 0.8 && (this.health < this.maxHealth * 0.6 || this.stateTime > 3)) {
       const cover = this._findCover();
@@ -304,7 +351,7 @@ class Enemy {
     if (!cp) { this.state = STATE.COMBAT; return; }
     const atCover = this.pos.distanceTo(cp) < 1.4;
     if (!atCover) {
-      this._moveToward({ x: cp.x, z: cp.z }, this.def.speed, dt);
+      this._navTo({ x: cp.x, z: cp.z }, this.def.speed, dt);
     } else {
       // peek and fire if we can see player; else regroup
       this._faceTo(player.eyePos, dt, 8);
@@ -318,7 +365,7 @@ class Enemy {
     if (!this.flankTarget || this.pos.distanceTo(new THREE.Vector3(this.flankTarget.x, 0, this.flankTarget.z)) < 2 || this.stateTime > 5) {
       this.state = STATE.COMBAT; this.stateTime = 0; return;
     }
-    this._moveToward(this.flankTarget, this.def.speed, dt);
+    this._navTo(this.flankTarget, this.def.speed, dt);
     if (playerVisible && this.stateTime > 1) this._shoot(dt, player, dist);
   }
 
@@ -338,11 +385,52 @@ class Enemy {
     }
   }
 
+  _updateLaser(player, visible) {
+    const charging = (this.charging || 0) > 0.02 && visible;
+    if (!charging) { this.laser.material.opacity = damp(this.laser.material.opacity, 0, 12, 0.016); return; }
+    const a = this.eyePos.clone();
+    const fwd = new THREE.Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw));
+    a.addScaledVector(fwd, 0.6);
+    const b = player.eyePos.clone();
+    const arr = this.laser.geometry.attributes.position.array;
+    arr[0] = a.x; arr[1] = a.y; arr[2] = a.z;
+    arr[3] = b.x; arr[4] = b.y; arr[5] = b.z;
+    this.laser.geometry.attributes.position.needsUpdate = true;
+    // intensifies as the shot charges
+    this.laser.material.opacity = 0.25 + this.charging * 0.7;
+  }
+
+  _tryGrenade(player, dist) {
+    if (!this.def.grenades || this.grenadeCD > 0) return false;
+    if (dist < 8 || dist > 32) return false;
+    // Lob at the player's position; great for flushing a camping player.
+    if (Math.random() < 0.5) {
+      this.mgr.throwEnemyGrenade(this.eyePos.clone(), player.pos.clone());
+      this.grenadeCD = rand(7, 12);
+      return true;
+    }
+    this.grenadeCD = rand(2, 4);
+    return false;
+  }
+
   _shoot(dt, player, dist) {
     const def = this.def;
     if (this.reactionTimer > 0) return;
     if (dist > def.range * 1.2) return;
-    if (this.mgr.segmentBlocked(this.eyePos, player.eyePos)) return;
+    if (this.mgr.segmentBlocked(this.eyePos, player.eyePos)) { if (def.sniper) this.charging = 0; return; }
+
+    // Sniper: telegraphed charge shot the player can dodge by breaking LOS/moving.
+    if (def.sniper) {
+      this._faceTo(player.eyePos, dt, 10);
+      this.charging = Math.min(1, (this.charging || 0) + dt / def.chargeTime);
+      if (this.charging >= 1 && this.fireTimer <= 0) {
+        this._fireBullet(player, dist, true);
+        this.charging = 0;
+        this.fireTimer = def.fireRate / this.mgr.fireRateMul * rand(0.9, 1.2);
+      }
+      this.fireTimer -= dt;
+      return;
+    }
 
     if (this.burstLeft > 0) {
       this.burstTimer -= dt;
@@ -361,28 +449,30 @@ class Enemy {
     }
   }
 
-  _fireBullet(player, dist) {
+  _fireBullet(player, dist, precise = false) {
     const def = this.def;
-    // accuracy degrades with distance and player movement; improves with difficulty.
-    const baseAcc = def.accuracy * this.mgr.accuracyMul;
+    // accuracy degrades with distance/player movement, improves with difficulty,
+    // and is reduced while suppressed.
+    const baseAcc = def.accuracy * this.mgr.accuracyMul * (1 - (this.suppressed || 0) * 0.5);
     const movePenalty = Math.hypot(player.vel.x, player.vel.z) > 4 ? 0.18 : 0;
-    const hitChance = clamp(baseAcc - dist / (def.range * 2.5) - movePenalty, 0.05, 0.95);
+    let hitChance = clamp(baseAcc - dist / (def.range * 2.5) - movePenalty, 0.05, 0.95);
+    if (precise) hitChance = 0.97;                 // sniper landed its charge
     this.muzzleCooldown = 0.05;
     audio.enemyShot();
-    // tracer + muzzle flash
+    const tColor = def.sniper ? 0xff2a1a : 0xff6644;
     const muzzle = this.eyePos.clone();
     const fwd = new THREE.Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw));
     muzzle.addScaledVector(fwd, 0.5);
     const aim = player.eyePos.clone();
     if (Math.random() > hitChance) {
-      // miss: scatter the tracer
       aim.add(new THREE.Vector3(rand(-2, 2), rand(-1, 2), rand(-2, 2)));
-      this.mgr.effects.tracer(muzzle, aim, 0xff6644, 0.05);
+      this.mgr.effects.tracer(muzzle, aim, tColor, def.sniper ? 0.12 : 0.05);
     } else {
-      this.mgr.effects.tracer(muzzle, aim, 0xff6644, 0.05);
+      this.mgr.effects.tracer(muzzle, aim, tColor, def.sniper ? 0.12 : 0.05);
       player.damage(def.damage * rand(0.85, 1.15), this.pos.clone());
     }
-    this.mgr.effects.muzzleFlashLight(muzzle, 0xff8844, 2.5, 0.04);
+    this.mgr.effects.muzzleFlashLight(muzzle, def.sniper ? 0xff3322 : 0xff8844, def.sniper ? 4 : 2.5, 0.05);
+    this.mgr.effects.muzzleFlash(muzzle, fwd, def.boss ? 1.2 : 0.7);
     this.muzzleFlashT = 0.05;
   }
 
@@ -392,6 +482,35 @@ class Enemy {
     if (dir.lengthSq() < 0.0001) return;
     this._steer(dir, speed, dt);
     this._faceMovement(dt);
+  }
+
+  // Path-following move toward a distant goal using A*. Recomputes when the goal
+  // shifts, the path is exhausted, or the throttle elapses. Falls back to direct
+  // steering for nearby goals or when no path is found.
+  _navTo(goal, speed, dt) {
+    const gx = goal.x, gz = goal.z;
+    const distToGoal = Math.hypot(gx - this.pos.x, gz - this.pos.z);
+    if (distToGoal < 2.5) { this._moveToward(goal, speed, dt); this.path = null; return; }
+
+    this.repathTimer -= dt;
+    const goalMoved = !this.pathGoal || Math.hypot(this.pathGoal.x - gx, this.pathGoal.z - gz) > 3;
+    if (!this.path || this.pathIndex >= this.path.length || (this.repathTimer <= 0 && goalMoved)) {
+      const p = this.mgr.findPath(this.pos, { x: gx, z: gz });
+      this.path = (p && p.length) ? p : null;
+      this.pathIndex = 0;
+      this.pathGoal = { x: gx, z: gz };
+      this.repathTimer = rand(0.4, 0.8);
+    }
+
+    if (!this.path) { this._moveToward(goal, speed, dt); return; }
+    // advance through reached waypoints
+    let wp = this.path[this.pathIndex];
+    while (wp && Math.hypot(wp.x - this.pos.x, wp.z - this.pos.z) < 1.3) {
+      this.pathIndex++;
+      wp = this.path[this.pathIndex];
+    }
+    if (!wp) { this._moveToward(goal, speed, dt); return; }
+    this._moveToward(wp, speed, dt);
   }
 
   _steer(dir, speed, dt) {
@@ -496,6 +615,7 @@ class Enemy {
 
   dispose() {
     this.mgr.scene.remove(this.group);
+    if (this.laser) { this.mgr.scene.remove(this.laser); this.laser.geometry.dispose(); this.laser.material.dispose(); this.laser = null; }
     this.group.traverse((o) => {
       if (o.isMesh) { o.geometry.dispose?.(); if (o.material.map) o.material.map.dispose?.(); o.material.dispose?.(); }
     });
@@ -513,6 +633,7 @@ export class EnemyManager {
     this.hitboxes = [];
     this.raycaster = new THREE.Raycaster();
     this.onKillCb = null;
+    this.enemyGrenades = [];
 
     // Difficulty knobs (scaled externally per wave).
     this.healthMul = 1;
@@ -556,6 +677,53 @@ export class EnemyManager {
       if (e.dead) continue;
       e.alertLevel = 1; e.lastSeenPos = this.player.eyePos.clone();
       if (e.state === STATE.IDLE || e.state === STATE.PATROL) { e.state = STATE.COMBAT; e.reactionTimer = this.reactionTime; }
+    }
+  }
+
+  findPath(start, goal) {
+    return this.world.navGrid ? this.world.navGrid.findPath(start, goal) : null;
+  }
+
+  // Enemy grenade: a thrown projectile that arcs toward a target and explodes,
+  // damaging the player (not other enemies — keeps squads from self-destructing).
+  throwEnemyGrenade(from, target) {
+    const geo = new THREE.SphereGeometry(0.12, 8, 6);
+    const mat = new THREE.MeshStandardMaterial({ color: 0x3a2a1a, emissive: 0xff4400, emissiveIntensity: 0.4, roughness: 0.7 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.copy(from);
+    this.scene.add(mesh);
+    // ballistic solve-ish: aim with an upward arc toward target.
+    const flat = new THREE.Vector3(target.x - from.x, 0, target.z - from.z);
+    const range = flat.length();
+    const t = clamp(range / 12, 0.7, 1.8);
+    const vel = flat.multiplyScalar(1 / t);
+    vel.y = 0.5 * 18 * t;             // counter gravity over flight time
+    this.enemyGrenades.push({ mesh, vel, fuse: t + 0.5 });
+  }
+
+  _updateEnemyGrenades(dt) {
+    for (let i = this.enemyGrenades.length - 1; i >= 0; i--) {
+      const g = this.enemyGrenades[i];
+      g.fuse -= dt;
+      g.vel.y -= 18 * dt;
+      g.mesh.position.addScaledVector(g.vel, dt);
+      if (g.mesh.position.y < 0.12) { g.mesh.position.y = 0.12; g.vel.y = -g.vel.y * 0.4; g.vel.x *= 0.7; g.vel.z *= 0.7; }
+      g.mesh.material.emissiveIntensity = 0.4 + Math.abs(Math.sin(g.fuse * 18)) * (g.fuse < 0.8 ? 1.4 : 0.3);
+      if (g.fuse <= 0) {
+        const pos = g.mesh.position.clone();
+        this.scene.remove(g.mesh); g.mesh.geometry.dispose(); g.mesh.material.dispose();
+        this.effects.explosion(pos);
+        audio.explosion();
+        const pd = this.player.eyePos.distanceTo(pos);
+        const radius = 6;
+        if (pd < radius && !this.player.dead && !this.segmentBlocked(pos, this.player.eyePos)) {
+          this.player.damage(95 * (1 - pd / radius), pos);
+          this.player.shake(0.6, 0.4);
+        } else if (pd < radius * 1.6) {
+          this.player.shake(0.25, 0.25);
+        }
+        this.enemyGrenades.splice(i, 1);
+      }
     }
   }
 
@@ -769,12 +937,15 @@ export class EnemyManager {
         this.enemies.splice(i, 1);
       }
     }
+    this._updateEnemyGrenades(dt);
   }
 
   clear() {
     for (const e of this.enemies) e.dispose();
     this.enemies.length = 0;
     this.hitboxes.length = 0;
+    for (const g of this.enemyGrenades) { this.scene.remove(g.mesh); g.mesh.geometry.dispose?.(); g.mesh.material.dispose?.(); }
+    this.enemyGrenades.length = 0;
   }
 }
 

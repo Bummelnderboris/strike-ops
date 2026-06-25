@@ -18,23 +18,29 @@ Pick a kill target, hit **START MATCH**.
 
 ## Controls
 
-| Action | Player 1 | Player 2 |
-|--------|----------|----------|
-| Move   | `W A S D` | Arrow keys |
-| Shoot  | `Space`  | `.` (period) |
-| Reload | `R`      | `,` (comma) |
-| Dash   | `Left Shift` | `/` (slash) |
-| Pause  | `P` (either) | |
+| Action  | Player 1 | Player 2 | Gamepad |
+|---------|----------|----------|---------|
+| Move    | `W A S D` | Arrow keys | Left stick |
+| Aim/Shoot | `Space` (aim = move dir) | `.` (period) | Right stick / `RT` |
+| Reload  | `R`      | `,` (comma) | `X` |
+| Dash    | `Left Shift` | `/` (slash) | `A` / `LT` |
+| Grenade | `Q`      | `Right Shift` | `RB` |
+| Pause   | `P` (either) | | |
 
-Players aim in the direction they're moving (twin-stick feel on one keyboard).
+On keyboard you aim in the direction you're moving. Plug in **gamepads** (auto-detected, one per player) for true twin-stick aiming.
 
 ## Features
 
-- **Cover-based arena** — central bunker, pillars, side walls, and crates to fight around.
-- **4 weapons** — Pistol (default), SMG, Shotgun, Rifle, each with its own damage, fire rate, magazine, reload time, spread and knockback.
-- **Pickups** — weapon crates (random SMG/Shotgun/Rifle) and med-kits, which respawn on a timer.
-- **Combat systems** — reloading (with ring indicator + auto-reload on empty), dash with cooldown, knockback, recoil, spawn protection, respawns at the spawn farthest from enemies.
-- **Juice** — muzzle flashes, blood/spark/debris particles, screen shake, synthesized sound effects (WebAudio, no asset files), floating "ELIMINATED" / pickup text.
+- **3 maps** — Bunker, Crossfire, Quarters (or Random), each with its own cover, spawns and pickup layout.
+- **Two game modes** — Deathmatch (first to the kill target) and Gun Game (every kill advances your weapon; clear all tiers to win).
+- **6 weapons** — Pistol, SMG, Shotgun, Rifle, Sniper (laser tracer), Minigun (spin-up), each tuned for damage / fire rate / magazine / spread / knockback.
+- **Grenades** — cooked fuse, bounce off walls, area damage + knockback; regenerate over time.
+- **Destructible cover** — wooden crates break apart, and explosive barrels chain-react.
+- **Power-ups** — armor/overshield, damage berserk (×1.6), speed boost; plus med-kits and weapon crates. All respawn on a timer.
+- **Killstreaks** — announcer + kill feed ("First Blood", "Double Kill", "Rampage"…), with bonus armor every 3-kill streak.
+- **CPU opponent** — set Player 2 to a bot (Easy / Normal / Insane) for solo play: it leads its aim, uses cover, dodges fire, and throws grenades.
+- **Combat systems** — reloading (ring indicator + auto-reload on empty), dash with cooldown, knockback, recoil, spawn protection, farthest-spawn respawns.
+- **Juice** — vignette lighting, damage flash, muzzle flashes, blood/spark/debris/smoke particles, screen shake, floating damage numbers, a 3·2·1 countdown, and a full WebAudio synth soundtrack (no asset files).
 - **Match flow** — live scoreboard, configurable kills-to-win, win screen with K/D stats, rematch.
 
 ## Files

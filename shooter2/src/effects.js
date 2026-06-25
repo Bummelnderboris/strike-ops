@@ -42,6 +42,34 @@ export class Effects {
       const l = new THREE.PointLight(0xffcc66, 0, 9, 2);
       l.visible = false; scene.add(l); this.muzzleLights.push({ light: l, t: 0 });
     }
+
+    // Muzzle-flash meshes: a bright additive star + forward cone, picked up by
+    // the bloom pass for a punchy glow. Pooled.
+    this._flashGeoStar = new THREE.PlaneGeometry(0.14, 0.14);
+    this._flashGeoCone = new THREE.ConeGeometry(0.045, 0.2, 7, 1, true);
+    this._flashPool = new Pool(() => {
+      const grp = new THREE.Group();
+      const star = new THREE.Mesh(this._flashGeoStar, new THREE.MeshBasicMaterial({ color: 0xfff0b0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+      const cone = new THREE.Mesh(this._flashGeoCone, new THREE.MeshBasicMaterial({ color: 0xffd070, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+      cone.rotation.x = -Math.PI / 2; cone.position.z = -0.12;
+      grp.add(star); grp.add(cone);
+      grp.visible = false; this.group.add(grp);
+      return grp;
+    });
+  }
+
+  // Brief muzzle flash at the gun's muzzle, oriented down the shot direction.
+  muzzleFlash(pos, dir, scale = 1) {
+    const grp = this._flashPool.acquire();
+    grp.visible = true;
+    grp.position.copy(pos);
+    grp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), dir);
+    grp.rotateZ(rand(0, Math.PI * 2));
+    const s = scale * rand(0.85, 1.2);
+    grp.scale.setScalar(s);
+    grp.children[0].material.opacity = 1;
+    grp.children[1].material.opacity = 0.9;
+    this.flashes.push({ grp, life: 0.05, maxLife: 0.05 });
   }
 
   _spawnParticle(pos, vel, color, size, life, gravity = -9, fade = true, drag = 2) {
@@ -200,6 +228,20 @@ export class Effects {
         if (ml.t <= 0) { ml.light.visible = false; ml.light.intensity = 0; }
       }
     }
+    // Muzzle flashes
+    for (let i = this.flashes.length - 1; i >= 0; i--) {
+      const f = this.flashes[i];
+      f.life -= dt;
+      if (f.life <= 0) {
+        f.grp.visible = false;
+        this._flashPool.release(f.grp);
+        this.flashes.splice(i, 1);
+        continue;
+      }
+      const t = f.life / f.maxLife;
+      f.grp.children[0].material.opacity = t;
+      f.grp.children[1].material.opacity = t * 0.9;
+    }
   }
 
   clearTransient() {
@@ -209,5 +251,7 @@ export class Effects {
     this.tracers.length = 0;
     for (const d of this.decals) this.group.remove(d.mesh);
     this.decals.length = 0;
+    for (const f of this.flashes) { f.grp.visible = false; this._flashPool.release(f.grp); }
+    this.flashes.length = 0;
   }
 }

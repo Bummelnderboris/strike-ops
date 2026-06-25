@@ -304,9 +304,11 @@ export class WeaponSystem {
     // Recoil pattern.
     this._applyRecoil();
 
-    // Muzzle flash light at the gun.
-    const flashPos = origin.clone().addScaledVector(forward, 0.7);
+    // Muzzle flash: light + glowing mesh near the gun's muzzle.
+    const rightV = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+    const flashPos = origin.clone().addScaledVector(forward, 0.9).addScaledVector(rightV, 0.12).add(new THREE.Vector3(0, -0.12, 0));
     this.effects.muzzleFlashLight(flashPos, 0xffcc66, 5, 0.05);
+    this.effects.muzzleFlash(flashPos, forward, def.pellets > 1 ? 1.5 : (def.scoped ? 1.3 : 1.0));
 
     // Sound + viewmodel kick + shake + shell eject.
     audio.gunshot(def.sound);

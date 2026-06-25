@@ -2,6 +2,7 @@
 // static collision boxes (AABBs), nav/cover/spawn points, lighting and atmosphere.
 import * as THREE from 'three';
 import { rand, randInt } from './util.js';
+import { NavGrid } from './nav.js';
 
 // Procedural noise-ish texture for surfaces (canvas based, no external files).
 function makeNoiseTexture(base = '#3a3f47', spec = 0.12, size = 256, lines = false) {
@@ -50,6 +51,14 @@ export class World {
     this._buildSky();
     this._buildLighting();
     this._buildLevel();
+
+    // Pathfinding grid over the playable arena.
+    this.navGrid = new NavGrid(
+      this.colliders,
+      new THREE.Vector3(-48, 0, -48),
+      new THREE.Vector3(48, 0, 48),
+      1.8, 0.7
+    );
   }
 
   _buildMaterials() {

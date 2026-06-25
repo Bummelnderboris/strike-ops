@@ -46,10 +46,25 @@
               <option value="gg">Gun Game</option>
             </select>
           </label>
+          <label>Map:
+            <select id="map">
+              <option value="bunker" selected>Bunker</option>
+              <option value="crossfire">Crossfire</option>
+              <option value="quarters">Quarters</option>
+              <option value="random">Random</option>
+            </select>
+          </label>
           <label>Player 2:
             <select id="opponent">
               <option value="human" selected>Human</option>
               <option value="cpu">CPU bot</option>
+            </select>
+          </label>
+          <label>Bot:
+            <select id="difficulty">
+              <option value="easy">Easy</option>
+              <option value="normal" selected>Normal</option>
+              <option value="insane">Insane</option>
             </select>
           </label>
           <label>Kills to win:
@@ -63,7 +78,7 @@
         </div>
 
         <button id="startBtn">START MATCH</button>
-        <p class="hint">Grab weapons, med-kits, armor &amp; power-ups. Cook grenades, blow the barrels, use cover.<br>Deathmatch: first to the kill target. Gun Game: kill your way through every weapon.</p>
+        <p class="hint">Grab weapons, med-kits, armor &amp; power-ups. Cook grenades, blow the barrels, use cover.<br>Deathmatch: first to the kill target. Gun Game: kill your way through every weapon.<br><span id="padHint">🎮 Gamepads auto-detected — left stick move, right stick aim &amp; fire, A dash, X reload, RB grenade.</span></p>
       </div>
     </div>
 

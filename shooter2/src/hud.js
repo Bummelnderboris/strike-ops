@@ -104,6 +104,10 @@ input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:16px; he
   color:#cfe0ec; font-size:14px; letter-spacing:0.08em; opacity:0; transition:opacity .2s; }
 #hint .kbd { font-size:13px; }
 #scoped { position:absolute; inset:0; pointer-events:none; opacity:0; transition:opacity .12s; }
+#bossbar { position:absolute; top:54px; left:50%; transform:translateX(-50%); width:min(520px,60vw); }
+#bossbar .bosslabel { display:flex; justify-content:space-between; font-size:12px; letter-spacing:0.2em; color:var(--accent); margin-bottom:4px; }
+#bossbar .bosstrack { height:9px; background:rgba(20,8,8,0.8); border:1px solid rgba(255,75,62,0.5); }
+#bossbar .bossfill { height:100%; width:100%; background:linear-gradient(90deg,#ff7a1a,#ff2a1a); transition:width .15s; box-shadow:0 0 12px rgba(255,75,62,0.6); }
 .stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px 28px; margin:20px 0; }
 .stat { border-left:2px solid var(--accent2); padding-left:12px; }
 .stat .k { font-size:11px; color:#7f93a3; letter-spacing:0.16em; }
@@ -247,6 +251,15 @@ export class HUD {
       <line x1="40" y1="50" x2="60" y2="50" stroke="#1a1a1a" stroke-width="0.5"/>
     </svg>`;
 
+    // Boss bar
+    const boss = this._el('div', '', '', hud); boss.id = 'bossbar'; boss.classList.add('hidden');
+    boss.innerHTML = `<div class="bosslabel"><span id="bossname">TITAN</span><span id="bosshp">100%</span></div>
+      <div class="bosstrack"><div class="bossfill" id="bossfill"></div></div>`;
+    this.bossbar = boss;
+    this.bossfill = boss.querySelector('#bossfill');
+    this.bossname = boss.querySelector('#bossname');
+    this.bosshp = boss.querySelector('#bosshp');
+
     // Banner + hint
     this.banner = this._el('div', '', '<div class="bt"></div><div class="bs"></div>', hud);
     this.banner.id = 'banner';
@@ -362,6 +375,17 @@ export class HUD {
     // Crosshair spread
     this.setCrosshair(data.crosshairSpread, data.scoped && data.ads > 0.6);
     this.scoped.style.opacity = (data.scoped && data.ads > 0.6) ? 1 : 0;
+
+    // Boss bar
+    if (data.boss && data.boss.alive) {
+      this.bossbar.classList.remove('hidden');
+      const pct = clamp(data.boss.hp / data.boss.maxHp, 0, 1);
+      this.bossfill.style.width = (pct * 100) + '%';
+      this.bossname.textContent = data.boss.name;
+      this.bosshp.textContent = Math.ceil(pct * 100) + '%';
+    } else {
+      this.bossbar.classList.add('hidden');
+    }
 
     // Compass
     this._updateCompass(data.yaw);

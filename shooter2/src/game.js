@@ -79,6 +79,7 @@ export class Game {
     this._waveActive = false;
     this._betweenWaves = false;
     this.objectives = [];
+    this.boss = null;
     this.upgrades = { health: 0, regen: 0, speed: 0, ammo: 0 };
     this._clearPickups();
   }
@@ -190,6 +191,7 @@ export class Game {
     audio.setIntensity(clamp(0.25 + w * 0.06, 0, 1));
 
     // Compose the wave roster.
+    const isBossWave = w % 5 === 0;
     const count = Math.min(6 + Math.floor(w * 1.8), 26);
     const roster = [];
     for (let i = 0; i < count; i++) {
@@ -197,9 +199,13 @@ export class Game {
       const roll = Math.random();
       if (w >= 3 && roll < 0.25 + w * 0.01) type = 'rusher';
       if (w >= 4 && roll > 0.85) type = 'heavy';
+      if (w >= 5 && roll > 0.78 && roll < 0.86) type = 'sniper';
       if (w >= 8 && roll > 0.7) type = Math.random() > 0.5 ? 'heavy' : 'rusher';
       roster.push(type);
     }
+    // Boss every 5th wave: a TITAN leads the assault.
+    this.boss = null;
+    if (isBossWave) roster.unshift('titan');
     // Spawn pacing: trickle them in so it never dumps all at once.
     this._spawnQueue = roster;
     this._spawnTimer = 1.0;
@@ -334,6 +340,7 @@ export class Game {
     }
     best = best || spawns[randInt(0, spawns.length - 1)];
     const e = this.enemies.spawn(type, new THREE.Vector3(best.x, 0, best.z));
+    if (type === 'titan') { this.boss = e; this.hud.banner_('⚠ TITAN INBOUND', 'ELITE TARGET', 2.2); audio.alarm(); }
     return e;
   }
 
@@ -543,6 +550,7 @@ export class Game {
       score: this.score, waveText, combo: this.combo,
       objective, objectiveProg, objMarker,
       crosshairSpread: spread, scoped: def.scoped, ads: w.ads,
+      boss: this.boss ? { alive: !this.boss.dead, hp: this.boss.health, maxHp: this.boss.maxHealth, name: this.boss.def.name } : null,
       yaw: p.yaw, px: p.pos.x, pz: p.pos.z,
       colliders: this.world.colliders,
       enemies: this.enemies.enemies.filter((e) => !e.dead).map((e) => ({ x: e.pos.x, z: e.pos.z, alert: e.alertLevel > 0.5 })),
